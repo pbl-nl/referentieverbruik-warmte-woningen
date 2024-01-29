@@ -592,7 +592,7 @@ if __name__ == "__main__":
     wegschrijven_per_gemeente_parameter = False # Wanneer True wordt voor iedere gemeente een aparte output .csv gemaakt. Als False, dan alle output in een .csv
     
     # Inlezen data
-    df_gemeentedata_input = inlezen_gemeentedata(path, GM_codes)
+    df_gemeentedata_input = inlezen_gemeentedata(path, GM_codes).reset_index(drop=True)
     brondata_dict         = inlezen_brondata(path)
     
     df_gemeentedata_input = datavoorbereiding_niet_ingevulde_velden(df_gemeentedata_input)
