@@ -332,14 +332,14 @@ def bereken_metervragen(df_output, installatie_parameters):
     benodigde_variabelen_installatie_parameters_koken = ['Woning/vbo_id','SPF_KK', 'Input_name_KK']
     df_input_metervraag_koken = df_output[benodigde_variabelen_df_output_koken].merge(installatie_parameters[benodigde_variabelen_installatie_parameters_koken], on='Woning/vbo_id')
     metervragen_koken = bereken_metervraag_koken(df_input_metervraag_koken)
-    df_output = merge_metervraag_in_df_ouput(df_output, metervragen_koken)
+    df_output = merge_metervraag_in_df_output(df_output, metervragen_koken)
 
     # Warm tapwater
     benodigde_variabelen_df_output_warm_tapwater = ['Woning/vbo_id','Functionele vraag/warm tapwater']
     benodigde_variabelen_installatie_parameters_warm_tapwater = ['Woning/vbo_id','SPF_b_TW_b', 'SPF_p_TW_p', 'P_vol_TW_b', 'Input_name_TW_b','Input_name_TW_p']
     df_input_metervraag_warm_tapwater = df_output[benodigde_variabelen_df_output_warm_tapwater].merge(installatie_parameters[benodigde_variabelen_installatie_parameters_warm_tapwater], on='Woning/vbo_id')
     metervragen_warm_tapwater = bereken_metervraag_warm_tapwater(df_input_metervraag_warm_tapwater)
-    df_output = merge_metervraag_in_df_ouput(df_output, metervragen_warm_tapwater)
+    df_output = merge_metervraag_in_df_output(df_output, metervragen_warm_tapwater)
 
     # Ruimteverwarming
     benodigde_variabelen_df_output_ruimteverwarming = ['Woning/vbo_id','Functionele vraag/ruimteverwarming']
@@ -353,7 +353,7 @@ def bereken_metervragen(df_output, installatie_parameters):
     benodigde_variabelen_installatie_parameters_hulpenergie = ['Woning/vbo_id', 'P_cap_TW_b', 'P_cap_RV_b', 'eEffect_cap_TW_b','eEffect_cap_TW_p','eEffect_cap_RV_b','eEffect_cap_RV_p']
     df_input_metervraag_hulpenergie = df_output[benodigde_variabelen_df_output_hulpenergie].merge(installatie_parameters[benodigde_variabelen_installatie_parameters_hulpenergie], on='Woning/vbo_id')
     metervraag_hulpenergie = bereken_metervraag_hulpenergie(df_input_metervraag_hulpenergie)
-    df_output = merge_metervraag_in_df_ouput(df_output, metervraag_hulpenergie)
+    df_output = merge_metervraag_in_df_output(df_output, metervraag_hulpenergie)
     
     return df_output
 
@@ -442,7 +442,7 @@ def bereken_metervraag_hulpenergie(df_input):
 
     return metervraag_hulpenergie
 
-def merge_metervraag_in_df_ouput(df_output, metervraag):
+def merge_metervraag_in_df_output(df_output, metervraag):
     '''        
     Zet uitkomsten van berekening metervragen op juiste plek in df_output ipv achteraan
     '''        
