@@ -346,7 +346,7 @@ def bereken_metervragen(df_output, installatie_parameters):
     benodigde_variabelen_installatie_parameters_ruimteverwarming = ['Woning/vbo_id','SPF_b_RV_b', 'SPF_p_RV_p', 'P_vol_RV_b', 'Input_name_RV_b','Input_name_RV_p']
     df_input_metervraag_ruimteverwarming = df_output[benodigde_variabelen_df_output_ruimteverwarming].merge(installatie_parameters[benodigde_variabelen_installatie_parameters_ruimteverwarming], on='Woning/vbo_id')
     metervragen_ruimteverwarming = bereken_metervraag_ruimteverwarming(df_input_metervraag_ruimteverwarming)
-    df_output = merge_metervraag_in_df_ouput(df_output, metervragen_ruimteverwarming)
+    df_output = merge_metervraag_in_df_output(df_output, metervragen_ruimteverwarming)
     
     # Hulpenergie
     benodigde_variabelen_df_output_hulpenergie = ['Woning/vbo_id', 'Woningkenmerken/woningtype', 'Functionele vraag/ruimteverwarming']
