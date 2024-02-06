@@ -7,7 +7,7 @@ Created on Wed Apr 12 09:15:33 2023
 # Reset parameters tussen python runs in Spyder
 from IPython import get_ipython
 get_ipython().run_line_magic('reset', '-sf')
-#%%
+
 # Import modules
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -132,17 +132,33 @@ def overnemen_basisdata(df_input, df_output):
         
     return df_output
 
-def bereken_functionele_vraag(df_output, benodigde_woningkenmerken):
+def bereken_functionele_vraag(df_output_start, benodigde_woningkenmerken):
     '''
     Geeft structuur voor het berekenen van de functionele vraag
     '''
-    df_output['Aantal bewoners/Aantal bewoners']    = bereken_huishoudgrootte(df_output.loc[:,benodigde_woningkenmerken], brondata_dict['Kentallen_aantal_bewoners_populatie_1a_1b'], brondata_dict['Kentallen_aantal_bewoners_populatie_2'])
-    df_output['Functionele vraag/koken']            = bereken_functionele_vraag_koken(df_output.loc[:,benodigde_woningkenmerken], brondata_dict['Kentallen_koken'])
-    df_output['Functionele vraag/warm tapwater']    = bereken_functionele_vraag_warm_tapwater(df_output.loc[:,benodigde_woningkenmerken], brondata_dict['Kentallen_warm_tapwater'])
-    df_output['Functionele vraag/ruimteverwarming'] = bereken_functionele_vraag_ruimteverwarming(df_output.loc[:,benodigde_woningkenmerken], brondata_dict['Kentallen_ruimteverwarming_populatie_1a'], brondata_dict['Kentallen_ruimteverwarming_populatie_1b'], brondata_dict['Kentallen_ruimteverwarming_populatie_2'])
-    df_output['Functionele vraag/Totaal']           = df_output['Functionele vraag/koken'] + df_output['Functionele vraag/warm tapwater'] + df_output['Functionele vraag/ruimteverwarming']  
+
+    df_aantal_bewoners = bereken_huishoudgrootte(df_output_start.loc[:,benodigde_woningkenmerken], brondata_dict['Kentallen_aantal_bewoners_populatie_1a_1b'], brondata_dict['Kentallen_aantal_bewoners_populatie_2'])
+    df_output          = df_output_start.merge(df_aantal_bewoners, how='right', on=['Woning/vbo_id'], suffixes=('_placeholder', None))
+        
+    df_FV_KK  = bereken_functionele_vraag_koken(df_output.loc[:,benodigde_woningkenmerken], brondata_dict['Kentallen_koken'])
+    df_output = df_output.merge(df_FV_KK, how='right', on=['Woning/vbo_id'], suffixes=('_placeholder', None))
+        
+    df_FV_TW  = bereken_functionele_vraag_warm_tapwater(df_output.loc[:,benodigde_woningkenmerken], brondata_dict['Kentallen_warm_tapwater'])
+    df_output = df_output.merge(df_FV_TW, how='right', on=['Woning/vbo_id'], suffixes=('_placeholder', None))
+       
+    df_FV_RV  = bereken_functionele_vraag_ruimteverwarming(df_output.loc[:,benodigde_woningkenmerken], brondata_dict['Kentallen_ruimteverwarming_populatie_1a'], brondata_dict['Kentallen_ruimteverwarming_populatie_1b'], brondata_dict['Kentallen_ruimteverwarming_populatie_2'])
+    df_output = df_output.merge(df_FV_RV, how='right', on=['Woning/vbo_id'], suffixes=('_placeholder', None))
+        
+    df_output['Functionele vraag/Totaal'] = df_output['Functionele vraag/koken'] + df_output['Functionele vraag/warm tapwater'] + df_output['Functionele vraag/ruimteverwarming']  
+        
     df_output = functionele_vraag_bij_datagebrek(df_output)
+    
     # Predictieinterval is een todo
+
+    # Herstorteren kolommen
+    cols = df_output_start.columns
+    df_output = df_output[df_output.columns.drop(list(df_output.filter(regex='_placeholder')))]
+    df_output = df_output.reindex(columns = cols)
 
     return df_output
 
@@ -168,14 +184,17 @@ def bereken_huishoudgrootte(df_output, datatabel_1, datatabel_2):
     
     res = df_output.merge(datatabel_1, how='left', on=['Woningkenmerken/woningtype', 'Woningkenmerken/bouwperiode', 'Woningkenmerken/eigendom', 'Woningkenmerken/schillabel'])
     res =       res.merge(datatabel_2, how='left', on=['Woningkenmerken/woningtype', 'Woningkenmerken/bouwperiode', 'Woningkenmerken/eigendom'                              ])
+    
     huishoudgrootte_1 = res['Woningkenmerken/oppervlakte'] * res['RE_OA_a_1'] + res['RE_OA_b_1']
     huishoudgrootte_2 = res['Woningkenmerken/oppervlakte'] * res['RE_OA_a_2'] + res['RE_OA_b_2']
     
-    res['Huishoudgrootte'] = huishoudgrootte_1
-    res['Huishoudgrootte'] = res['Huishoudgrootte'].fillna(huishoudgrootte_2)
-    res['Huishoudgrootte'] = res['Huishoudgrootte'].round(0)
+    res['Aantal bewoners/Aantal bewoners'] = huishoudgrootte_1
+    res['Aantal bewoners/Aantal bewoners'] = res['Aantal bewoners/Aantal bewoners'].fillna(huishoudgrootte_2)
+    res['Aantal bewoners/Aantal bewoners'] = res['Aantal bewoners/Aantal bewoners'].round(0)
     
-    return res['Huishoudgrootte']
+    df_aantal_bewoners = res.loc[:,['Woning/vbo_id', 'Aantal bewoners/Aantal bewoners']]
+
+    return df_aantal_bewoners
 
 def bereken_functionele_vraag_koken(df_output, datatabel_koken):
     '''
@@ -187,11 +206,14 @@ def bereken_functionele_vraag_koken(df_output, datatabel_koken):
     SPF_gasfornuis = brondata_dict['Aannames_installaties_voor_koken'].loc[0, 'SPF']
 
     res = df_output.merge(datatabel_koken, how='left', left_on=['TNO_bouwjaarklasse_code', 'TNO_oppervlakteklasse_code', 'Aantal bewoners/Aantal bewoners'], right_on=['Bouwjaarklasse code', 'Oppervlakteklasse TNO code', 'Huishoudgrootte'])
+    res['Functionele vraag/koken'] = res['Gecorrigeerd gasgebruik koken [m3]'] * constanten_dict['onderwaarde_energieinhoud_aardgas_m3_naar_GJ'] * SPF_gasfornuis
+    res['Functionele vraag/koken'] = res['Functionele vraag/koken'] * res['Functionele vraag/Lokale praktijkfactor']
 
-    res['functionele vraag koken'] = res['Gecorrigeerd gasgebruik koken [m3]'] * constanten_dict['onderwaarde_energieinhoud_aardgas_m3_naar_GJ'] * SPF_gasfornuis
-    res['functionele vraag koken'] = res['functionele vraag koken'] * res['Functionele vraag/Lokale praktijkfactor']
+    res_FV_KK = res.loc[:,['Woning/vbo_id', 'Functionele vraag/koken']]
+    df_FV_KK  = df_output.merge(res_FV_KK, how='left', on=['Woning/vbo_id'])
+    df_FV_KK = df_FV_KK.loc[:,['Woning/vbo_id', 'Functionele vraag/koken']]
     
-    return res['functionele vraag koken']
+    return df_FV_KK
 
 def bereken_functionele_vraag_warm_tapwater(df_output, datatabel_tapwater):
     '''
@@ -209,10 +231,12 @@ def bereken_functionele_vraag_warm_tapwater(df_output, datatabel_tapwater):
     res['functionele vraag tapwater basis'] = res['gasverbruik warm water (m3)'] * constanten_dict['onderwaarde_energieinhoud_aardgas_m3_naar_GJ'] * P_vol_Hr * SPF_b_Hr
     res['functionele vraag tapwater piek'] = res['gasverbruik warm water (m3)'] * constanten_dict['onderwaarde_energieinhoud_aardgas_m3_naar_GJ'] * (1-P_vol_Hr) * SPF_p_Hr
 
-    res['functionele vraag tapwater'] = res['functionele vraag tapwater basis']  + res['functionele vraag tapwater piek']
-    res['functionele vraag tapwater'] = res['functionele vraag tapwater'] * res['Functionele vraag/Lokale praktijkfactor']
+    res['Functionele vraag/warm tapwater'] = res['functionele vraag tapwater basis']  + res['functionele vraag tapwater piek']
+    res['Functionele vraag/warm tapwater'] = res['Functionele vraag/warm tapwater'] * res['Functionele vraag/Lokale praktijkfactor']
     
-    return res['functionele vraag tapwater']
+    df_FV_TW = res.loc[:,['Woning/vbo_id', 'Functionele vraag/warm tapwater']]
+
+    return df_FV_TW
 
 def bereken_functionele_vraag_ruimteverwarming(df_output, datatabel_1a, datatabel_1b, datatabel_2):
     '''
@@ -223,11 +247,11 @@ def bereken_functionele_vraag_ruimteverwarming(df_output, datatabel_1a, datatabe
     df_output_vrijstaand_zonder_label = df_output[(df_output['Woningkenmerken/woningtype'] == 1) & (df_output['Woningkenmerken/schillabel'] == 'x')]
     df_output_overig_met_label        = df_output[(df_output['Woningkenmerken/woningtype'] != 1) & (df_output['Woningkenmerken/schillabel'] != 'x')]
     df_output_overig_zonder_label     = df_output[(df_output['Woningkenmerken/woningtype'] != 1) & (df_output['Woningkenmerken/schillabel'] == 'x')]
-    df_output_zonder_label = pd.concat([df_output_vrijstaand_zonder_label,df_output_overig_zonder_label]).sort_index()
+    df_output_zonder_label = pd.concat([df_output_vrijstaand_zonder_label,df_output_overig_zonder_label])
 
-    res_vrijstaand_met_label = df_output_vrijstaand_met_label.merge(datatabel_1b, how='left', left_on=['Woningkenmerken/woningtype', 'Woningkenmerken/bouwperiode', 'Woningkenmerken/eigendom', 'Woningkenmerken/schillabel'], right_on=['W', 'B', 'E', 'S'])
-    res_overig_met_label     = df_output_overig_met_label.merge(    datatabel_1a, how='left', left_on=['Woningkenmerken/woningtype', 'Woningkenmerken/bouwperiode', 'Woningkenmerken/eigendom', 'Woningkenmerken/schillabel'], right_on=['W', 'B', 'E', 'S'])
-    res_zonder_label         = df_output_zonder_label.merge(        datatabel_2,  how='left', left_on=['Woningkenmerken/woningtype', 'Woningkenmerken/bouwperiode', 'Woningkenmerken/eigendom'], right_on=['W', 'B', 'E'])
+    res_vrijstaand_met_label = df_output_vrijstaand_met_label.reset_index().merge(datatabel_1b, how='left', left_on=['Woningkenmerken/woningtype', 'Woningkenmerken/bouwperiode', 'Woningkenmerken/eigendom', 'Woningkenmerken/schillabel'], right_on=['W', 'B', 'E', 'S']).set_index('index')
+    res_overig_met_label     = df_output_overig_met_label.reset_index().merge(    datatabel_1a, how='left', left_on=['Woningkenmerken/woningtype', 'Woningkenmerken/bouwperiode', 'Woningkenmerken/eigendom', 'Woningkenmerken/schillabel'], right_on=['W', 'B', 'E', 'S']).set_index('index')
+    res_zonder_label         = df_output_zonder_label.reset_index().merge(        datatabel_2,  how='left', left_on=['Woningkenmerken/woningtype', 'Woningkenmerken/bouwperiode', 'Woningkenmerken/eigendom'], right_on=['W', 'B', 'E']).set_index('index')
 
     res_vrijstaand_met_label['functionele vraag ruimteverwarming'] = res_vrijstaand_met_label['Woningkenmerken/oppervlakte'] * res_vrijstaand_met_label['RE_FO_a_WBE [m3 aardgas]'] + res_vrijstaand_met_label['RE_FO_b_WBSE [m3 aardgas]']
     res_overig_met_label['functionele vraag ruimteverwarming']     = res_overig_met_label['Woningkenmerken/oppervlakte'] * res_overig_met_label['RE_FO_a_WBE [m3 aardgas]'] + res_overig_met_label['RE_FO_b_WBSE [m3 aardgas]']
@@ -236,9 +260,17 @@ def bereken_functionele_vraag_ruimteverwarming(df_output, datatabel_1a, datatabe
     res = res.loc[:,['Woning/vbo_id', 'functionele vraag ruimteverwarming']]
     df_output = df_output.merge(res, how='left', on=['Woning/vbo_id'])
 
-    df_output['functionele vraag ruimteverwarming'] = df_output['functionele vraag ruimteverwarming'] * df_output['Functionele vraag/Lokale praktijkfactor'] * df_output['Regionale klimaatcorrectie/regionale klimaatcorrectie'] * constanten_dict['onderwaarde_energieinhoud_aardgas_m3_naar_GJ']
+    res = pd.concat([res_vrijstaand_met_label, res_overig_met_label, res_zonder_label])
+    res_FV_RV = res.loc[:,['Woning/vbo_id', 'functionele vraag ruimteverwarming']]
 
-    return df_output['functionele vraag ruimteverwarming']
+    df_FV_RV = df_output.merge(res_FV_RV, how='left', on=['Woning/vbo_id'])
+
+    df_FV_RV['Functionele vraag/ruimteverwarming'] = df_FV_RV['functionele vraag ruimteverwarming'] * df_FV_RV['Functionele vraag/Lokale praktijkfactor'] * df_FV_RV['Regionale klimaatcorrectie/regionale klimaatcorrectie'] * constanten_dict['onderwaarde_energieinhoud_aardgas_m3_naar_GJ']    
+    df_FV_RV = df_FV_RV.loc[:,['Woning/vbo_id', 'Functionele vraag/ruimteverwarming']]
+    
+    df_FV_RV.drop_duplicates(subset=['Woning/vbo_id'], inplace=True)
+    
+    return df_FV_RV
 
 def categoriseer_bouwjaarklasse_TNO(bouwjaar):
     '''
